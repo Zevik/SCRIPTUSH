@@ -551,9 +551,12 @@
                   
                   // הגדרת המשימות - עיבוד יותר מקיף של התוצאות
                   if (loadedTasks) {
+                    console.log('מתחיל עיבוד המשימות...');
+                    
                     // וידוא שהערך הוא מערך גם אם הגיע כמחרוזת JSON
                     try {
                       if (typeof loadedTasks === 'string') {
+                        console.log('ממיר מחרוזת JSON למערך');
                         loadedTasks = JSON.parse(loadedTasks);
                       }
                       
@@ -568,23 +571,48 @@
                         }
                       }
                       
+                      console.log('לפני סינון:', loadedTasks.length, 'משימות');
+                      
                       // סינון של ערכים לא תקינים
-                      loadedTasks = loadedTasks.filter(task => task && typeof task === 'object' && task.id && task.text);
+                      loadedTasks = loadedTasks.filter((task, index) => {
+                        if (!task || typeof task !== 'object') {
+                          console.warn(`משימה ${index} לא תקינה:`, task);
+                          return false;
+                        }
+                        if (!task.id || !task.text) {
+                          console.warn(`משימה ${index} חסרה שדות חשובים:`, task);
+                          return false;
+                        }
+                        return true;
+                      });
+                      
+                      console.log('אחרי סינון:', loadedTasks.length, 'משימות תקינות');
                     } catch (error) {
                       console.error('שגיאה בעיבוד המשימות:', error);
                       loadedTasks = [];
                     }
                     
                     if (loadedTasks.length > 0) {
+                      console.log('מעדכן מערך המשימות עם', loadedTasks.length, 'משימות');
                       tasks = loadedTasks;
                       
+                      console.log('קורא לפונקציית renderTasks');
                       renderTasks();
+                      
+                      console.log('מעדכן סטטיסטיקות');
                       updateTaskStats();
+                      
+                      console.log('מאתחל גרפים');
                       initializeCharts();
+                      
+                      console.log('מעדכן גרפים');
                       updateCharts();
+                      
+                      console.log('מאכלס הצעות משימות חוזרות');
                       populateRecurringTaskSuggestions();
                       
                       showMessage(`נטענו ${loadedTasks.length} משימות בהצלחה`, 'success');
+                      console.log('הטעינה הושלמה בהצלחה');
                       showLoading(false);
                     } else if (retryCount < maxRetries) {
                       retryCount++;
@@ -1031,11 +1059,20 @@
       
       // עדכון/רינדור רשימת המשימות
       function renderTasks() {
+        console.log('renderTasks נקראה, מערך המשימות:', tasks);
+        
         const taskList = document.getElementById('taskList');
+        if (!taskList) {
+          console.error('לא נמצא אלמנט taskList');
+          return;
+        }
+        
         taskList.innerHTML = '';
+        console.log('נוקה taskList');
         
         if (isLoading) {
           taskList.innerHTML = '<li class="task-item" style="justify-content: center; color: #888;">טוען משימות...</li>';
+          console.log('מצב טעינה, מציג הודעת טעינה');
           return;
         }
         
@@ -1064,57 +1101,72 @@
           return statusFilter && categoryFilter;
         });
         
+        console.log('משימות אחרי סינון:', filteredTasks.length);
+        
         if (filteredTasks.length === 0) {
           taskList.innerHTML = '<li class="task-item" style="justify-content: center; color: #888;">אין משימות להצגה</li>';
+          console.log('אין משימות אחרי הסינון');
           return;
         }
         
-        filteredTasks.forEach(task => {
-          const listItem = document.createElement('li');
-          listItem.className = `task-item ${task.completed ? 'completed' : ''}`;
-          listItem.dataset.id = task.id;
-          
-          let dateText = '';
-          if (task.date) {
-            const taskDate = new Date(task.date);
-            dateText = `<span class="task-date">${taskDate.toLocaleDateString('he-IL')}</span>`;
+        console.log('מתחיל ליצור אלמנטים עבור', filteredTasks.length, 'משימות');
+        
+        let elementsCreated = 0;
+        filteredTasks.forEach((task, index) => {
+          try {
+            console.log(`יוצר אלמנט עבור משימה ${index}:`, task.text);
+            const listItem = document.createElement('li');
+            listItem.className = `task-item ${task.completed ? 'completed' : ''}`;
+            listItem.dataset.id = task.id;
+            
+            let dateText = '';
+            if (task.date) {
+              const taskDate = new Date(task.date);
+              dateText = `<span class="task-date">${taskDate.toLocaleDateString('he-IL')}</span>`;
+            }
+            
+            // הוספת תגיות
+            let tagsHtml = '<div class="task-tags">';
+            
+            // תג עדיפות
+            if (task.priority) {
+              tagsHtml += `<span class="task-tag ${task.priority}">${getPriorityText(task.priority)}</span>`;
+            }
+            
+            // תג קטגוריה
+            if (task.category) {
+              tagsHtml += `<span class="task-tag">${getCategoryText(task.category)}</span>`;
+            }
+            
+            // תג מצב רוח (אם קיים)
+            if (task.mood) {
+              tagsHtml += `<span class="task-tag">${task.mood}</span>`;
+            }
+            
+            tagsHtml += '</div>';
+            
+            listItem.innerHTML = `
+              <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})">
+              <div class="task-content">
+                <span>${task.text}</span>
+                ${dateText}
+                ${tagsHtml}
+              </div>
+              <div class="task-actions">
+                <button onclick="editTask(${task.id})" title="ערוך">✏️</button>
+                <button onclick="deleteTask(${task.id})" title="מחק">🗑️</button>
+              </div>
+            `;
+            
+            taskList.appendChild(listItem);
+            elementsCreated++;
+            console.log(`אלמנט ${index} נוצר בהצלחה`);
+          } catch (error) {
+            console.error(`שגיאה ביצירת אלמנט עבור משימה ${index}:`, error, task);
           }
-          
-          // הוספת תגיות
-          let tagsHtml = '<div class="task-tags">';
-          
-          // תג עדיפות
-          if (task.priority) {
-            tagsHtml += `<span class="task-tag ${task.priority}">${getPriorityText(task.priority)}</span>`;
-          }
-          
-          // תג קטגוריה
-          if (task.category) {
-            tagsHtml += `<span class="task-tag">${getCategoryText(task.category)}</span>`;
-          }
-          
-          // תג מצב רוח (אם קיים)
-          if (task.mood) {
-            tagsHtml += `<span class="task-tag">${task.mood}</span>`;
-          }
-          
-          tagsHtml += '</div>';
-          
-          listItem.innerHTML = `
-            <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})">
-            <div class="task-content">
-              <span>${task.text}</span>
-              ${dateText}
-              ${tagsHtml}
-            </div>
-            <div class="task-actions">
-              <button onclick="editTask(${task.id})" title="ערוך">✏️</button>
-              <button onclick="deleteTask(${task.id})" title="מחק">🗑️</button>
-            </div>
-          `;
-          
-          taskList.appendChild(listItem);
         });
+        
+        console.log(`הושלמה יצירת ${elementsCreated} אלמנטים מתוך ${filteredTasks.length} משימות`);
       }
       
       // פונקציה להמרת ערך עדיפות לטקסט
