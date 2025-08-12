@@ -532,23 +532,43 @@
       document.addEventListener('DOMContentLoaded', () => {
         showLoading(true);
         
-        // טעינת המשימות מהשרת (Google Sheets)
+        console.log('מתחיל טעינת משימות מהשרת...');
+        
+        // בדיקת החיבור תחילה
         google.script.run
-          .withSuccessHandler(function(loadedTasks) {
-            tasks = loadedTasks || [];
-            renderTasks();
-            updateTaskStats();
-            initializeCharts();
-            updateCharts();
-            populateRecurringTaskSuggestions();
-            showLoading(false);
+          .withSuccessHandler(function(connectionResult) {
+            console.log('בדיקת חיבור:', connectionResult);
+            
+            // טעינת המשימות מהשרת (Google Sheets)
+            google.script.run
+              .withSuccessHandler(function(loadedTasks) {
+                console.log('התקבלו משימות:', loadedTasks);
+                tasks = loadedTasks || [];
+                renderTasks();
+                updateTaskStats();
+                initializeCharts();
+                updateCharts();
+                populateRecurringTaskSuggestions();
+                showLoading(false);
+                if (loadedTasks && loadedTasks.length > 0) {
+                  showMessage(`נטענו ${loadedTasks.length} משימות בהצלחה`, 'success');
+                } else {
+                  showMessage('לא נמצאו משימות בגיליון', 'success');
+                }
+              })
+              .withFailureHandler(function(error) {
+                console.error('שגיאה בטעינת המשימות:', error);
+                showMessage('שגיאה בטעינת המשימות מהשרת: ' + error, 'error');
+                showLoading(false);
+              })
+              .loadTasksFromSheet();
           })
           .withFailureHandler(function(error) {
-            console.error('שגיאה בטעינת המשימות:', error);
-            showMessage('שגיאה בטעינת המשימות מהשרת', 'error');
+            console.error('שגיאה בבדיקת החיבור:', error);
+            showMessage('שגיאה בחיבור לשרת: ' + error, 'error');
             showLoading(false);
           })
-          .loadTasksFromSheet();
+          .testConnection();
       });
       
       // הצגת אנימציית טעינה

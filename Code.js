@@ -82,42 +82,59 @@ function saveTasksToSheet(tasks) {
  */
 function loadTasksFromSheet() {
   try {
+    Logger.log('מתחיל טעינת משימות מהגיליון');
+    
     // גישה לספרדשיט הפעיל
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('tasks');
+    Logger.log('נמצא ספרדשיט: ' + ss.getName());
     
+    const sheet = ss.getSheetByName('tasks');
     if (!sheet) {
       // אם הגיליון לא קיים, צור אותו
+      Logger.log('גיליון tasks לא נמצא, יוצר גיליון חדש');
       createTasksSheetIfNotExists();
       return [];
     }
     
+    Logger.log('נמצא גיליון: ' + sheet.getName());
+    
     // בדיקה אם יש נתונים בגיליון
     const lastRow = sheet.getLastRow();
+    Logger.log('מספר שורות בגיליון: ' + lastRow);
+    
     if (lastRow <= 1) {
+      Logger.log('אין משימות בגיליון, רק כותרות');
       return []; // רק כותרות, אין משימות
     }
     
     // קריאת כל הנתונים מהגיליון
     const data = sheet.getRange(2, 1, lastRow - 1, 11).getValues();
+    Logger.log('נקראו ' + data.length + ' משימות מהגיליון');
     
     // המרת הנתונים למערך של אובייקטי משימה
     const tasks = data.map(row => {
-      return {
-        id: Number(row[0]),
-        text: row[1],
-        completed: row[2] === 'true',
-        date: row[3] || null,
-        createdAt: row[4],
-        completedAt: row[5] || null,
-        priority: row[6] || 'medium',
-        category: row[7] || 'general',
-        mood: row[8] || null,
-        isRecurring: row[9] === 'true',
-        recurringId: row[10] ? Number(row[10]) : null
-      };
-    });
+      try {
+        return {
+          id: Number(row[0]),
+          text: row[1],
+          completed: row[2] === 'true' || row[2] === true,
+          date: row[3] || null,
+          createdAt: row[4],
+          completedAt: row[5] || null,
+          priority: row[6] || 'medium',
+          category: row[7] || 'general',
+          mood: row[8] || null,
+          isRecurring: row[9] === 'true' || row[9] === true,
+          recurringId: row[10] ? Number(row[10]) : null
+        };
+      } catch (error) {
+        Logger.log('שגיאה בהמרת שורה לאובייקט משימה: ' + error);
+        Logger.log('שורה בעייתית: ' + JSON.stringify(row));
+        return null; // דילוג על שורה בעייתית
+      }
+    }).filter(task => task !== null); // סינון שורות בעייתיות
     
+    Logger.log('נוצרו ' + tasks.length + ' אובייקטי משימה');
     return tasks;
   } catch (error) {
     Logger.log('שגיאה בטעינת המשימות: ' + error);
@@ -275,14 +292,29 @@ function getSpreadsheetById() {
  */
 function testConnection() {
   try {
+    Logger.log('בדיקת חיבור לספרדשיט');
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    return {
+    const sheetsInfo = ss.getSheets().map(sheet => {
+      const name = sheet.getName();
+      const rows = sheet.getLastRow();
+      return {
+        name: name,
+        rows: rows,
+        hasContent: rows > 1
+      };
+    });
+    
+    const result = {
       status: "success",
       name: ss.getName(),
       url: ss.getUrl(),
-      sheets: ss.getSheets().map(sheet => sheet.getName())
+      sheets: sheetsInfo
     };
+    
+    Logger.log('חיבור תקין: ' + JSON.stringify(result));
+    return result;
   } catch (error) {
+    Logger.log('שגיאת חיבור: ' + error);
     return {
       status: "error",
       message: error.toString()
