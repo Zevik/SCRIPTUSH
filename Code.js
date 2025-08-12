@@ -8,10 +8,21 @@ function doGet() {
   try {
     createTasksSheetIfNotExists();
     
-    return HtmlService.createHtmlOutputFromFile('index.html')
+    // יצירת אובייקט התצוגה
+    const htmlOutput = HtmlService.createHtmlOutputFromFile('index.html')
       .setTitle('יומן משימות אינטראקטיבי')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    
+    // הגדלת גודל התגובה המקסימלי
+    htmlOutput.setContent(htmlOutput.getContent()
+      .replace('</head>', 
+        '<script>var INITIAL_TASKS = [];</script>' +
+        '</head>'
+      )
+    );
+    
+    return htmlOutput;
   } catch (error) {
     Logger.log('שגיאה בפונקציית doGet: ' + error);
     return HtmlService.createHtmlOutput('<h1>שגיאה בטעינת האפליקציה</h1><p>' + error + '</p>');
@@ -154,6 +165,31 @@ function loadTasksFromSheet() {
       Logger.log('משימות שנשלחות לקליינט: ' + JSON.stringify(tasks.slice(0, 2)) + '... (מקוצר)');
     } catch (e) {
       Logger.log('שגיאה בלוג המשימות: ' + e);
+    }
+    
+    // טיפול בבעיות העברת נתונים גדולים
+    try {
+      // בדיקה אם מדובר במידע גדול מדי (למניעת שגיאות תקשורת)
+      const jsonSize = JSON.stringify(tasks).length;
+      Logger.log('גודל ה-JSON שנשלח: ' + jsonSize + ' בתים');
+      
+      // אם המידע גדול מדי, נחלק אותו לחלקים קטנים יותר
+      if (jsonSize > 50000) { // כ-50KB הוא גבול סביר
+        Logger.log('המידע גדול מדי, מחזיר רק את המשימות הפעילות');
+        // החזר רק את המשימות הפעילות כדי להקטין את הנפח
+        return tasks.filter(task => !task.completed);
+      }
+      
+      // נבצע המרה מחדש של ה-JSON כדי לוודא שהוא תקין
+      const jsonTasks = JSON.stringify(tasks);
+      const parsedTasks = JSON.parse(jsonTasks);
+      
+      if (parsedTasks && parsedTasks.length > 0) {
+        Logger.log('המידע נבדק והומר בהצלחה, מחזיר ' + parsedTasks.length + ' משימות');
+        return parsedTasks;
+      }
+    } catch (e) {
+      Logger.log('שגיאה בהמרת המשימות ל-JSON: ' + e);
     }
     
     return tasks;

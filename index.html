@@ -534,76 +534,128 @@
         
         console.log('מתחיל טעינת משימות מהשרת...');
         
-        // בדיקת החיבור תחילה
-        google.script.run
-          .withSuccessHandler(function(connectionResult) {
-            console.log('בדיקת חיבור:', connectionResult);
-            
-            // טעינת המשימות מהשרת (Google Sheets)
-            google.script.run
-              .withSuccessHandler(function(loadedTasks) {
-                console.log('התקבלו משימות:', loadedTasks);
-                
-                // הגדרת המשימות - עיבוד יותר מקיף של התוצאות
-                if (loadedTasks) {
-                  // וידוא שהערך הוא מערך גם אם הגיע כמחרוזת JSON
-                  try {
-                    if (typeof loadedTasks === 'string') {
-                      loadedTasks = JSON.parse(loadedTasks);
-                    }
-                    
-                    // וידוא שזה מערך
-                    if (!Array.isArray(loadedTasks)) {
-                      console.warn('התוצאה אינה מערך:', loadedTasks);
-                      if (loadedTasks && typeof loadedTasks === 'object') {
-                        // ניסיון להמיר אובייקט למערך אם אפשר
-                        loadedTasks = Object.values(loadedTasks);
-                      } else {
-                        loadedTasks = [];
+        // מנגנון ניסיונות חוזרים
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        function loadTasksWithRetry() {
+          // בדיקת החיבור תחילה
+          google.script.run
+            .withSuccessHandler(function(connectionResult) {
+              console.log('בדיקת חיבור:', connectionResult);
+              
+              // טעינת המשימות מהשרת (Google Sheets)
+              google.script.run
+                .withSuccessHandler(function(loadedTasks) {
+                  console.log('התקבלו משימות:', loadedTasks);
+                  
+                  // הגדרת המשימות - עיבוד יותר מקיף של התוצאות
+                  if (loadedTasks) {
+                    // וידוא שהערך הוא מערך גם אם הגיע כמחרוזת JSON
+                    try {
+                      if (typeof loadedTasks === 'string') {
+                        loadedTasks = JSON.parse(loadedTasks);
                       }
+                      
+                      // וידוא שזה מערך
+                      if (!Array.isArray(loadedTasks)) {
+                        console.warn('התוצאה אינה מערך:', loadedTasks);
+                        if (loadedTasks && typeof loadedTasks === 'object') {
+                          // ניסיון להמיר אובייקט למערך אם אפשר
+                          loadedTasks = Object.values(loadedTasks);
+                        } else {
+                          loadedTasks = [];
+                        }
+                      }
+                      
+                      // סינון של ערכים לא תקינים
+                      loadedTasks = loadedTasks.filter(task => task && typeof task === 'object' && task.id && task.text);
+                    } catch (error) {
+                      console.error('שגיאה בעיבוד המשימות:', error);
+                      loadedTasks = [];
                     }
                     
-                    // סינון של ערכים לא תקינים
-                    loadedTasks = loadedTasks.filter(task => task && typeof task === 'object' && task.id && task.text);
-                  } catch (error) {
-                    console.error('שגיאה בעיבוד המשימות:', error);
-                    loadedTasks = [];
-                  }
-                  
-                  tasks = loadedTasks;
-                  
-                  renderTasks();
-                  updateTaskStats();
-                  initializeCharts();
-                  updateCharts();
-                  populateRecurringTaskSuggestions();
-                  
-                  if (loadedTasks.length > 0) {
-                    showMessage(`נטענו ${loadedTasks.length} משימות בהצלחה`, 'success');
+                    if (loadedTasks.length > 0) {
+                      tasks = loadedTasks;
+                      
+                      renderTasks();
+                      updateTaskStats();
+                      initializeCharts();
+                      updateCharts();
+                      populateRecurringTaskSuggestions();
+                      
+                      showMessage(`נטענו ${loadedTasks.length} משימות בהצלחה`, 'success');
+                      showLoading(false);
+                    } else if (retryCount < maxRetries) {
+                      retryCount++;
+                      console.warn(`ניסיון טעינה ${retryCount}/${maxRetries} נכשל, מנסה שוב...`);
+                      setTimeout(loadTasksWithRetry, 1000); // נסה שוב אחרי שניה
+                    } else {
+                      console.error('כל ניסיונות הטעינה נכשלו');
+                      showMessage('לא נמצאו משימות תקינות אחרי מספר ניסיונות', 'error');
+                      tasks = [];
+                      renderTasks();
+                      updateTaskStats();
+                      initializeCharts();
+                      updateCharts();
+                      populateRecurringTaskSuggestions();
+                      showLoading(false);
+                    }
                   } else {
-                    showMessage('לא נמצאו משימות תקינות בגיליון', 'success');
+                    if (retryCount < maxRetries) {
+                      retryCount++;
+                      console.warn(`ניסיון טעינה ${retryCount}/${maxRetries} נכשל, מנסה שוב...`);
+                      setTimeout(loadTasksWithRetry, 1000); // נסה שוב אחרי שניה
+                    } else {
+                      console.warn('לא התקבלו נתונים מהשרת אחרי מספר ניסיונות');
+                      showMessage('לא התקבלו נתונים מהשרת, נסה לרענן את הדף', 'error');
+                      tasks = [];
+                      renderTasks();
+                      updateTaskStats();
+                      initializeCharts();
+                      updateCharts();
+                      populateRecurringTaskSuggestions();
+                      showLoading(false);
+                    }
                   }
-                } else {
-                  console.warn('לא התקבלו נתונים מהשרת');
-                  showMessage('לא התקבלו נתונים מהשרת', 'error');
-                  tasks = [];
-                }
-                
+                })
+                .withFailureHandler(function(error) {
+                  console.error('שגיאה בטעינת המשימות:', error);
+                  
+                  if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.warn(`שגיאה בטעינה ${retryCount}/${maxRetries}, מנסה שוב...`);
+                    setTimeout(loadTasksWithRetry, 1000); // נסה שוב אחרי שניה
+                  } else {
+                    showMessage('שגיאה בטעינת המשימות מהשרת: ' + error, 'error');
+                    tasks = [];
+                    renderTasks();
+                    updateTaskStats();
+                    initializeCharts();
+                    updateCharts();
+                    populateRecurringTaskSuggestions();
+                    showLoading(false);
+                  }
+                })
+                .loadTasksFromSheet();
+            })
+            .withFailureHandler(function(error) {
+              console.error('שגיאה בבדיקת החיבור:', error);
+              
+              if (retryCount < maxRetries) {
+                retryCount++;
+                console.warn(`שגיאה בחיבור ${retryCount}/${maxRetries}, מנסה שוב...`);
+                setTimeout(loadTasksWithRetry, 1000); // נסה שוב אחרי שניה
+              } else {
+                showMessage('שגיאה בחיבור לשרת: ' + error, 'error');
                 showLoading(false);
-              })
-              .withFailureHandler(function(error) {
-                console.error('שגיאה בטעינת המשימות:', error);
-                showMessage('שגיאה בטעינת המשימות מהשרת: ' + error, 'error');
-                showLoading(false);
-              })
-              .loadTasksFromSheet();
-          })
-          .withFailureHandler(function(error) {
-            console.error('שגיאה בבדיקת החיבור:', error);
-            showMessage('שגיאה בחיבור לשרת: ' + error, 'error');
-            showLoading(false);
-          })
-          .testConnection();
+              }
+            })
+            .testConnection();
+        }
+        
+        // התחלת הטעינה עם ניסיונות חוזרים
+        loadTasksWithRetry();
       });
       
       // הצגת אנימציית טעינה
