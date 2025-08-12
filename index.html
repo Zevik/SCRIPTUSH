@@ -255,8 +255,13 @@
       
       // טעינת משימות בטעינת הדף
       document.addEventListener('DOMContentLoaded', () => {
-        // כרגע משימות נשמרות רק בזיכרון הפנימי של האפליקציה
-        // בהמשך אפשר להוסיף שמירה בשרת או ב-Google Sheets
+        // בעתיד ניתן להוסיף כאן קריאה לשרת לטעינת משימות
+        // google.script.run.withSuccessHandler(function(loadedTasks) {
+        //   tasks = loadedTasks;
+        //   renderTasks();
+        //   updateTaskStats();
+        // }).loadTasksFromSheet();
+        
         renderTasks();
         updateTaskStats();
       });
@@ -264,6 +269,8 @@
       // עדכון סטטיסטיקות המשימות
       function saveTasks() {
         // שמירה רק בזיכרון הזמני
+        // בעתיד ניתן להוסיף כאן שמירה לשרת
+        // google.script.run.saveTasksToSheet(tasks);
         updateTaskStats();
       }
       
