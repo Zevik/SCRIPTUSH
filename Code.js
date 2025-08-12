@@ -24,24 +24,29 @@ function doGet() {
  */
 function saveTasksToSheet(tasks) {
   try {
+    Logger.log('מתחיל שמירת משימות לגיליון. מספר משימות: ' + (tasks ? tasks.length : 0));
+    
+    // בדיקה שיש משימות לשמור
+    if (!tasks || tasks.length === 0) {
+      Logger.log('אין משימות לשמור');
+      return true;  // אין צורך למחוק את הנתונים הקיימים אם אין מה לשמור
+    }
+    
     // גישה לספרדשיט הפעיל
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('tasks');
     
     if (!sheet) {
       // אם הגיליון לא קיים, צור אותו
+      Logger.log('גיליון tasks לא נמצא, יוצר גיליון חדש');
       createTasksSheetIfNotExists();
       return saveTasksToSheet(tasks); // קריאה רקורסיבית לאחר יצירת הגיליון
     }
     
-    // ניקוי הגיליון הקיים (מלבד כותרות)
+    // ניקוי הגיליון הקיים (מלבד כותרות) רק אם יש משימות לשמור
     if (sheet.getLastRow() > 1) {
+      Logger.log('מוחק ' + (sheet.getLastRow() - 1) + ' שורות קיימות');
       sheet.deleteRows(2, sheet.getLastRow() - 1);
-    }
-    
-    // אם אין משימות, החזר אמת
-    if (!tasks || tasks.length === 0) {
-      return true;
     }
     
     // המרת המשימות לשורות בגיליון

@@ -543,18 +543,28 @@
             google.script.run
               .withSuccessHandler(function(loadedTasks) {
                 console.log('התקבלו משימות:', loadedTasks);
-                tasks = loadedTasks || [];
-                renderTasks();
-                updateTaskStats();
-                initializeCharts();
-                updateCharts();
-                populateRecurringTaskSuggestions();
-                showLoading(false);
-                if (loadedTasks && loadedTasks.length > 0) {
-                  showMessage(`נטענו ${loadedTasks.length} משימות בהצלחה`, 'success');
+                
+                // הגדרת המשימות רק אם התקבלו משימות תקינות מהשרת
+                if (loadedTasks && Array.isArray(loadedTasks)) {
+                  tasks = loadedTasks;
+                  
+                  renderTasks();
+                  updateTaskStats();
+                  initializeCharts();
+                  updateCharts();
+                  populateRecurringTaskSuggestions();
+                  
+                  if (loadedTasks.length > 0) {
+                    showMessage(`נטענו ${loadedTasks.length} משימות בהצלחה`, 'success');
+                  } else {
+                    showMessage('לא נמצאו משימות בגיליון', 'success');
+                  }
                 } else {
-                  showMessage('לא נמצאו משימות בגיליון', 'success');
+                  console.warn('לא התקבלו משימות תקינות מהשרת');
+                  showMessage('לא ניתן לטעון משימות מהשרת', 'error');
                 }
+                
+                showLoading(false);
               })
               .withFailureHandler(function(error) {
                 console.error('שגיאה בטעינת המשימות:', error);
@@ -601,15 +611,26 @@
       
       // עדכון ושמירת המשימות
       function saveTasks() {
+        // בדיקה אם יש מה לשמור
+        if (!tasks || tasks.length === 0) {
+          console.log('אין משימות לשמור');
+          loadTasks(); // טעינה מחדש של המשימות מהשרת במקום למחוק את הכל
+          return;
+        }
+        
         showLoading(true);
+        console.log('שומר ' + tasks.length + ' משימות לשרת...');
         
         // שמירת המשימות בשרת (Google Sheets)
         google.script.run
           .withSuccessHandler(function(success) {
             if (success) {
+              console.log('המשימות נשמרו בהצלחה');
+              dataChanged = false; // איפוס סמן השינויים
               updateTaskStats();
               updateCharts();
               showLoading(false);
+              showMessage('המשימות נשמרו בהצלחה', 'success');
             } else {
               showMessage('שגיאה בשמירת המשימות', 'error');
               showLoading(false);
@@ -872,6 +893,8 @@
           return;
         }
         
+        markDataAsChanged(); // סימון שהיו שינויים
+        
         const newTask = {
           id: Date.now(),
           text: taskInput.value.trim(),
@@ -1028,6 +1051,7 @@
       function deleteTask(id) {
         if (confirm('האם אתה בטוח שברצונך למחוק משימה זו?')) {
           tasks = tasks.filter(task => task.id !== id);
+          markDataAsChanged(); // סימון שהיו שינויים
           saveTasks(); // שמירה לשרת
           showMessage('המשימה נמחקה בהצלחה', 'success');
         }
@@ -1251,6 +1275,65 @@
         
         // הוספת הכפתור לפני כפתור היצוא
         document.querySelector('.task-filters').appendChild(refreshButton);
+      });
+      
+      // מניעת מחיקת נתונים בעת סגירת הדף אם אין שינויים
+      let dataChanged = false;
+      
+      // עדכון משתנה המסמן אם היו שינויים בנתונים
+      function markDataAsChanged() {
+        dataChanged = true;
+      }
+      
+      // הוספת האזנה לאירועים שמשנים את הנתונים
+      function addTaskChangeListeners() {
+        // הוספת האזנה לפונקציות שמשנות את המשימות
+        const originalAddNewTask = window.addNewTask;
+        window.addNewTask = function() {
+          markDataAsChanged();
+          return originalAddNewTask.apply(this, arguments);
+        };
+        
+        const originalToggleTask = window.toggleTask;
+        window.toggleTask = function() {
+          markDataAsChanged();
+          return originalToggleTask.apply(this, arguments);
+        };
+        
+        const originalDeleteTask = window.deleteTask;
+        window.deleteTask = function() {
+          markDataAsChanged();
+          return originalDeleteTask.apply(this, arguments);
+        };
+        
+        const originalEditTask = window.editTask;
+        window.editTask = function() {
+          markDataAsChanged();
+          return originalEditTask.apply(this, arguments);
+        };
+      }
+      
+      // הפעלת מאזיני השינויים
+      document.addEventListener('DOMContentLoaded', addTaskChangeListeners);
+      
+      // טיפול בסגירת הדף או רענון - לא לשמור אם לא היו שינויים
+      window.addEventListener('beforeunload', function(e) {
+        if (dataChanged && tasks.length > 0) {
+          // אם היו שינויים בנתונים, יש לשמור אותם
+          console.log('נסגר הדף עם שינויים, שומר את הנתונים...');
+          
+          // מכיוון שאירוע beforeunload לא מאפשר קריאות אסינכרוניות,
+          // נבצע את השמירה באופן סינכרוני אם אפשר
+          try {
+            // אפשרות לרמז למשתמש שיש שינויים לא שמורים
+            e.preventDefault();
+            e.returnValue = '';
+          } catch (error) {
+            console.error('שגיאה בטיפול בסגירת דף:', error);
+          }
+        } else {
+          console.log('נסגר הדף ללא שינויים בנתונים');
+        }
       });
     </script>
   </body>
