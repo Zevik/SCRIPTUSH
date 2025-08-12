@@ -526,36 +526,102 @@
       let recurringTasks = [];
       let charts = {};
       let activeChart = 'progress';
+      let isLoading = true;
       
       // טעינת משימות בטעינת הדף
       document.addEventListener('DOMContentLoaded', () => {
-        // בעתיד ניתן להוסיף כאן קריאה לשרת לטעינת משימות
-        // google.script.run.withSuccessHandler(function(loadedTasks) {
-        //   tasks = loadedTasks;
-        //   renderTasks();
-        //   updateTaskStats();
-        // }).loadTasksFromSheet();
+        showLoading(true);
         
-        initializeCharts();
-        populateRecurringTaskSuggestions();
-        renderTasks();
-        updateTaskStats();
-        updateCharts();
+        // טעינת המשימות מהשרת (Google Sheets)
+        google.script.run
+          .withSuccessHandler(function(loadedTasks) {
+            tasks = loadedTasks || [];
+            renderTasks();
+            updateTaskStats();
+            initializeCharts();
+            updateCharts();
+            populateRecurringTaskSuggestions();
+            showLoading(false);
+          })
+          .withFailureHandler(function(error) {
+            console.error('שגיאה בטעינת המשימות:', error);
+            showMessage('שגיאה בטעינת המשימות מהשרת', 'error');
+            showLoading(false);
+          })
+          .loadTasksFromSheet();
       });
       
-      // עדכון סטטיסטיקות המשימות
-      function saveTasks() {
-        // שמירה רק בזיכרון הזמני
-        // בעתיד ניתן להוסיף כאן שמירה לשרת
-        // google.script.run.saveTasksToSheet(tasks);
-        updateTaskStats();
-        updateCharts();
+      // הצגת אנימציית טעינה
+      function showLoading(show) {
+        isLoading = show;
+        if (show) {
+          // יצירת אלמנט טעינה אם לא קיים
+          if (!document.getElementById('loadingOverlay')) {
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'loadingOverlay';
+            loadingOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.8); display: flex; justify-content: center; align-items: center; z-index: 9999;';
+            
+            const spinner = document.createElement('div');
+            spinner.style.cssText = 'width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;';
+            
+            // הוספת אנימציה
+            const style = document.createElement('style');
+            style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+            document.head.appendChild(style);
+            
+            loadingOverlay.appendChild(spinner);
+            document.body.appendChild(loadingOverlay);
+          } else {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+          }
+        } else if (document.getElementById('loadingOverlay')) {
+          document.getElementById('loadingOverlay').style.display = 'none';
+        }
       }
       
-      // הפונקציה הזאת קיימת לצורך תמיכה בהרחבה עתידית
+      // עדכון ושמירת המשימות
+      function saveTasks() {
+        showLoading(true);
+        
+        // שמירת המשימות בשרת (Google Sheets)
+        google.script.run
+          .withSuccessHandler(function(success) {
+            if (success) {
+              updateTaskStats();
+              updateCharts();
+              showLoading(false);
+            } else {
+              showMessage('שגיאה בשמירת המשימות', 'error');
+              showLoading(false);
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('שגיאה בשמירת המשימות:', error);
+            showMessage('שגיאה בשמירת המשימות לשרת', 'error');
+            showLoading(false);
+          })
+          .saveTasksToSheet(tasks);
+      }
+      
+      // טעינת משימות מחדש
       function loadTasks() {
-        // כרגע אין טעינת משימות ממקור חיצוני
-        renderTasks();
+        showLoading(true);
+        
+        google.script.run
+          .withSuccessHandler(function(loadedTasks) {
+            tasks = loadedTasks || [];
+            renderTasks();
+            updateTaskStats();
+            updateCharts();
+            showLoading(false);
+            showMessage('המשימות נטענו בהצלחה', 'success');
+          })
+          .withFailureHandler(function(error) {
+            console.error('שגיאה בטעינת המשימות:', error);
+            showMessage('שגיאה בטעינת המשימות מהשרת', 'error');
+            showLoading(false);
+          })
+          .loadTasksFromSheet();
       }
       
       // אתחול הגרפים
@@ -798,8 +864,7 @@
         };
         
         tasks.push(newTask);
-        saveTasks();
-        renderTasks();
+        saveTasks(); // שמירה לשרת
         
         // נקה את השדות
         taskInput.value = '';
@@ -813,6 +878,11 @@
       function renderTasks() {
         const taskList = document.getElementById('taskList');
         taskList.innerHTML = '';
+        
+        if (isLoading) {
+          taskList.innerHTML = '<li class="task-item" style="justify-content: center; color: #888;">טוען משימות...</li>';
+          return;
+        }
         
         // סינון המשימות לפי הפילטר הנוכחי והקטגוריות
         const filteredTasks = tasks.filter(task => {
@@ -913,8 +983,7 @@
             tasks[taskIndex].completedAt = null;
           }
           
-          saveTasks();
-          renderTasks();
+          saveTasks(); // שמירה לשרת
           
           if (tasks[taskIndex].completed) {
             showMessage('כל הכבוד! המשימה הושלמה', 'success');
@@ -930,8 +999,7 @@
         const newText = prompt('עריכת משימה:', task.text);
         if (newText !== null && newText.trim() !== '') {
           task.text = newText.trim();
-          saveTasks();
-          renderTasks();
+          saveTasks(); // שמירה לשרת
           showMessage('המשימה עודכנה בהצלחה', 'success');
         }
       }
@@ -940,8 +1008,7 @@
       function deleteTask(id) {
         if (confirm('האם אתה בטוח שברצונך למחוק משימה זו?')) {
           tasks = tasks.filter(task => task.id !== id);
-          saveTasks();
-          renderTasks();
+          saveTasks(); // שמירה לשרת
           showMessage('המשימה נמחקה בהצלחה', 'success');
         }
       }
@@ -997,8 +1064,7 @@
         
         if (confirm(`האם אתה בטוח שברצונך למחוק ${completedCount} משימות שהושלמו?`)) {
           tasks = tasks.filter(task => !task.completed);
-          saveTasks();
-          renderTasks();
+          saveTasks(); // שמירה לשרת
           showMessage('המשימות שהושלמו נמחקו בהצלחה', 'success');
         }
       }
@@ -1143,8 +1209,7 @@
         };
         
         tasks.push(newTask);
-        saveTasks();
-        renderTasks();
+        saveTasks(); // שמירה לשרת
         
         closeModal('recurringTasksModal');
         showMessage(`הפעילות החוזרת "${taskName}" נוספה בהצלחה`, 'success');
@@ -1154,6 +1219,19 @@
       function closeModal(modalId) {
         document.getElementById(modalId).style.display = 'none';
       }
+      
+      // הוספת כפתור רענון במבט הראשי
+      document.addEventListener('DOMContentLoaded', function() {
+        // הוספת כפתור רענון לטעינת משימות מחדש
+        const refreshButton = document.createElement('button');
+        refreshButton.className = 'btn';
+        refreshButton.style.marginRight = '10px';
+        refreshButton.innerHTML = '🔄 רענן';
+        refreshButton.onclick = loadTasks;
+        
+        // הוספת הכפתור לפני כפתור היצוא
+        document.querySelector('.task-filters').appendChild(refreshButton);
+      });
     </script>
   </body>
 </html>
