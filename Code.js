@@ -5,12 +5,17 @@
  */
 function doGet() {
   // וידוא שקיים גיליון tasks
-  createTasksSheetIfNotExists();
-  
-  return HtmlService.createHtmlOutputFromFile('index.html')
-    .setTitle('יומן משימות אינטראקטיבי')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  try {
+    createTasksSheetIfNotExists();
+    
+    return HtmlService.createHtmlOutputFromFile('index.html')
+      .setTitle('יומן משימות אינטראקטיבי')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (error) {
+    Logger.log('שגיאה בפונקציית doGet: ' + error);
+    return HtmlService.createHtmlOutput('<h1>שגיאה בטעינת האפליקציה</h1><p>' + error + '</p>');
+  }
 }
 
 /**
@@ -125,6 +130,7 @@ function loadTasksFromSheet() {
  */
 function createTasksSheetIfNotExists() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.log('נמצא ספרדשיט: ' + ss.getName());
   let sheet = ss.getSheetByName('tasks');
   
   if (!sheet) {
@@ -243,9 +249,52 @@ function loadRecurringTasksFromSheet() {
 }
 
 /**
+ * פונקציה המאפשרת להגדיר במפורש את ה-ID של הספרדשיט
+ * הוסף את ה-ID של הספרדשיט שלך כאן אם יש בעיות התחברות
+ */
+function setSpreadsheetId(spreadsheetId) {
+  PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', spreadsheetId);
+  return "מזהה הספרדשיט הוגדר בהצלחה";
+}
+
+/**
+ * פונקציה לפתיחת ספרדשיט על פי ID במפורש
+ * משמשת כאשר יש בעיות בפתיחת הספרדשיט הפעיל
+ */
+function getSpreadsheetById() {
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if (!spreadsheetId) {
+    throw new Error('לא הוגדר מזהה ספרדשיט. השתמש בפונקציה setSpreadsheetId תחילה.');
+  }
+  return SpreadsheetApp.openById(spreadsheetId);
+}
+
+/**
+ * פונקציה לבדיקת החיבור לספרדשיט
+ * מחזירה מידע על הספרדשיט אם החיבור תקין
+ */
+function testConnection() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    return {
+      status: "success",
+      name: ss.getName(),
+      url: ss.getUrl(),
+      sheets: ss.getSheets().map(sheet => sheet.getName())
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: error.toString()
+    };
+  }
+}
+
+/**
  * הערות על השימוש באפליקציה זו:
  * 1. האפליקציה שומרת את המשימות בגיליון Google Sheets בשם "tasks"
  * 2. המשימות החוזרות נשמרות בגיליון נפרד בשם "recurring_tasks"
  * 3. קוד זה מחובר לריפו בכתובת: https://github.com/Zevik/SCRIPTUSH
  * 4. לאחר כל עדכון יש להריץ את הסקריפט update-script.ps1 כדי לדחוף את השינויים לגיטהאב ו-clasp
+ * 5. אם יש בעיות התחברות לספרדשיט, השתמש בפונקציה setSpreadsheetId כדי להגדיר את ה-ID במפורש
  */
