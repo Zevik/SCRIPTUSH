@@ -119,7 +119,7 @@ function loadTasksFromSheet() {
     // המרת הנתונים למערך של אובייקטי משימה
     const tasks = data.map(row => {
       try {
-        return {
+        const task = {
           id: Number(row[0]),
           text: row[1],
           completed: row[2] === 'true' || row[2] === true,
@@ -132,6 +132,14 @@ function loadTasksFromSheet() {
           isRecurring: row[9] === 'true' || row[9] === true,
           recurringId: row[10] ? Number(row[10]) : null
         };
+        
+        // בדיקה שהשדות החשובים קיימים
+        if (!task.id || !task.text) {
+          Logger.log('שורה חסרה שדות חשובים: ' + JSON.stringify(row));
+          return null;
+        }
+        
+        return task;
       } catch (error) {
         Logger.log('שגיאה בהמרת שורה לאובייקט משימה: ' + error);
         Logger.log('שורה בעייתית: ' + JSON.stringify(row));
@@ -140,6 +148,14 @@ function loadTasksFromSheet() {
     }).filter(task => task !== null); // סינון שורות בעייתיות
     
     Logger.log('נוצרו ' + tasks.length + ' אובייקטי משימה');
+    
+    // לוג של המשימות שנשלחות לקליינט
+    try {
+      Logger.log('משימות שנשלחות לקליינט: ' + JSON.stringify(tasks.slice(0, 2)) + '... (מקוצר)');
+    } catch (e) {
+      Logger.log('שגיאה בלוג המשימות: ' + e);
+    }
+    
     return tasks;
   } catch (error) {
     Logger.log('שגיאה בטעינת המשימות: ' + error);

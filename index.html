@@ -544,8 +544,32 @@
               .withSuccessHandler(function(loadedTasks) {
                 console.log('התקבלו משימות:', loadedTasks);
                 
-                // הגדרת המשימות רק אם התקבלו משימות תקינות מהשרת
-                if (loadedTasks && Array.isArray(loadedTasks)) {
+                // הגדרת המשימות - עיבוד יותר מקיף של התוצאות
+                if (loadedTasks) {
+                  // וידוא שהערך הוא מערך גם אם הגיע כמחרוזת JSON
+                  try {
+                    if (typeof loadedTasks === 'string') {
+                      loadedTasks = JSON.parse(loadedTasks);
+                    }
+                    
+                    // וידוא שזה מערך
+                    if (!Array.isArray(loadedTasks)) {
+                      console.warn('התוצאה אינה מערך:', loadedTasks);
+                      if (loadedTasks && typeof loadedTasks === 'object') {
+                        // ניסיון להמיר אובייקט למערך אם אפשר
+                        loadedTasks = Object.values(loadedTasks);
+                      } else {
+                        loadedTasks = [];
+                      }
+                    }
+                    
+                    // סינון של ערכים לא תקינים
+                    loadedTasks = loadedTasks.filter(task => task && typeof task === 'object' && task.id && task.text);
+                  } catch (error) {
+                    console.error('שגיאה בעיבוד המשימות:', error);
+                    loadedTasks = [];
+                  }
+                  
                   tasks = loadedTasks;
                   
                   renderTasks();
@@ -557,11 +581,12 @@
                   if (loadedTasks.length > 0) {
                     showMessage(`נטענו ${loadedTasks.length} משימות בהצלחה`, 'success');
                   } else {
-                    showMessage('לא נמצאו משימות בגיליון', 'success');
+                    showMessage('לא נמצאו משימות תקינות בגיליון', 'success');
                   }
                 } else {
-                  console.warn('לא התקבלו משימות תקינות מהשרת');
-                  showMessage('לא ניתן לטעון משימות מהשרת', 'error');
+                  console.warn('לא התקבלו נתונים מהשרת');
+                  showMessage('לא התקבלו נתונים מהשרת', 'error');
+                  tasks = [];
                 }
                 
                 showLoading(false);
@@ -647,19 +672,54 @@
       // טעינת משימות מחדש
       function loadTasks() {
         showLoading(true);
+        console.log('טוען משימות מהשרת...');
         
         google.script.run
           .withSuccessHandler(function(loadedTasks) {
-            tasks = loadedTasks || [];
-            renderTasks();
-            updateTaskStats();
-            updateCharts();
-            showLoading(false);
-            showMessage('המשימות נטענו בהצלחה', 'success');
+            console.log('התקבלו נתונים מהשרת:', loadedTasks);
+            
+            try {
+              // טיפול בתוצאות במקרה שהן חזרו כמחרוזת
+              if (typeof loadedTasks === 'string') {
+                try {
+                  loadedTasks = JSON.parse(loadedTasks);
+                } catch (e) {
+                  console.error('שגיאה בפירוס תוצאות:', e);
+                }
+              }
+              
+              // וידוא שהתוצאה היא מערך
+              if (!Array.isArray(loadedTasks)) {
+                if (loadedTasks && typeof loadedTasks === 'object') {
+                  loadedTasks = Object.values(loadedTasks);
+                } else {
+                  loadedTasks = [];
+                }
+              }
+              
+              // סינון ערכים לא תקינים
+              loadedTasks = loadedTasks.filter(task => task && typeof task === 'object' && task.id && task.text);
+              
+              tasks = loadedTasks;
+              renderTasks();
+              updateTaskStats();
+              updateCharts();
+              showLoading(false);
+              
+              if (tasks.length > 0) {
+                showMessage(`נטענו ${tasks.length} משימות בהצלחה`, 'success');
+              } else {
+                showMessage('לא נמצאו משימות תקינות', 'success');
+              }
+            } catch (error) {
+              console.error('שגיאה בעיבוד התוצאות:', error);
+              showMessage('שגיאה בעיבוד התוצאות: ' + error, 'error');
+              showLoading(false);
+            }
           })
           .withFailureHandler(function(error) {
             console.error('שגיאה בטעינת המשימות:', error);
-            showMessage('שגיאה בטעינת המשימות מהשרת', 'error');
+            showMessage('שגיאה בטעינת המשימות מהשרת: ' + error, 'error');
             showLoading(false);
           })
           .loadTasksFromSheet();
@@ -927,8 +987,22 @@
           return;
         }
         
+        // בדיקה שיש משימות בכלל
+        if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+          taskList.innerHTML = '<li class="task-item" style="justify-content: center; color: #888;">אין משימות במערכת</li>';
+          console.warn('אין משימות לתצוגה או שהמשימות אינן במבנה תקין:', tasks);
+          return;
+        }
+        
+        console.log('מציג משימות:', tasks.length);
+        
         // סינון המשימות לפי הפילטר הנוכחי והקטגוריות
         const filteredTasks = tasks.filter(task => {
+          if (!task || typeof task !== 'object') {
+            console.warn('משימה לא תקינה:', task);
+            return false;
+          }
+          
           const statusFilter = currentFilter === 'all' ||
                               (currentFilter === 'active' && !task.completed) ||
                               (currentFilter === 'completed' && task.completed);
