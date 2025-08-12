@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>יומן משימות אינטראקטיבי</title>
+    <!-- הוספת ספריית Chart.js לגרפים -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       /* עיצוב בסיסי ורספונסיבי עם תמיכה מלאה ב-RTL */
       body {
@@ -142,6 +144,7 @@
         padding: 15px;
         border-radius: 5px;
         margin-top: 30px;
+        margin-bottom: 20px;
       }
       .stat-box {
         text-align: center;
@@ -150,6 +153,165 @@
         font-size: 24px;
         font-weight: bold;
         color: #1a73e8;
+      }
+      
+      /* חלק הגרפים */
+      .charts-section {
+        margin-top: 30px;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+      }
+      .chart-container {
+        margin: 15px 0;
+        position: relative;
+        height: 250px;
+      }
+      .chart-tabs {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 15px;
+      }
+      .chart-tab {
+        padding: 8px 15px;
+        margin: 0 5px;
+        background-color: #e0e0e0;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      .chart-tab.active {
+        background-color: #1a73e8;
+        color: white;
+      }
+      
+      /* פעילויות חוזרות */
+      .recurring-tasks {
+        margin-top: 30px;
+        padding: 15px;
+        background-color: #e8f5e9;
+        border-radius: 8px;
+      }
+      .recurring-tasks h3 {
+        margin-top: 0;
+        color: #2e7d32;
+      }
+      .recurring-suggestion {
+        display: flex;
+        align-items: center;
+        margin: 10px 0;
+        padding: 10px;
+        background-color: #fff;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      .recurring-suggestion:hover {
+        background-color: #f0f9f0;
+        transform: translateY(-2px);
+      }
+      .recurring-suggestion span {
+        flex-grow: 1;
+      }
+      .recurring-icon {
+        font-size: 20px;
+        margin-left: 10px;
+        color: #4caf50;
+      }
+      
+      /* הגדרות תג */
+      .task-tags {
+        display: flex;
+        flex-wrap: wrap;
+        margin-top: 5px;
+      }
+      .task-tag {
+        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 12px;
+        margin-left: 5px;
+        margin-bottom: 5px;
+        background-color: #e3f2fd;
+        color: #1565c0;
+      }
+      .task-tag.high {
+        background-color: #ffebee;
+        color: #c62828;
+      }
+      .task-tag.medium {
+        background-color: #fff8e1;
+        color: #f57f17;
+      }
+      .task-tag.low {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+      }
+      
+      /* סימון קטגוריות */
+      .category-select {
+        margin-top: 10px;
+        width: 100%;
+        padding: 8px;
+        border-radius: 5px;
+        border: 1px solid #ddd;
+      }
+      
+      /* מודלים חדשים */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+      }
+      .modal-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 90%;
+        width: 500px;
+        z-index: 1001;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+      }
+      .modal-close {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: #999;
+      }
+      
+      /* מצבי רוח ומוטיבציה */
+      .mood-tracker {
+        display: flex;
+        justify-content: space-around;
+        margin: 20px 0;
+      }
+      .mood-icon {
+        font-size: 24px;
+        cursor: pointer;
+        padding: 10px;
+        border-radius: 50%;
+        transition: all 0.3s;
+      }
+      .mood-icon:hover, .mood-icon.selected {
+        background-color: #e3f2fd;
+        transform: scale(1.2);
       }
       
       /* הודעות מערכת */
@@ -206,10 +368,31 @@
       <!-- הודעות מערכת -->
       <div id="messageBox" class="message-box"></div>
       
+      <!-- מצב רוח ומוטיבציה יומית -->
+      <div class="mood-tracker">
+        <div class="mood-icon" onclick="setMood('😊')" title="שמח">😊</div>
+        <div class="mood-icon" onclick="setMood('😐')" title="רגיל">😐</div>
+        <div class="mood-icon" onclick="setMood('😞')" title="עצוב">😞</div>
+        <div class="mood-icon" onclick="setMood('😤')" title="מתוסכל">😤</div>
+        <div class="mood-icon" onclick="setMood('🚀')" title="מוטיבציה גבוהה">🚀</div>
+      </div>
+      
       <!-- טופס הוספת משימה -->
       <div class="task-input-container">
         <input type="text" id="newTaskInput" placeholder="הוסף משימה חדשה..." />
         <input type="date" id="newTaskDate" />
+        <select id="taskPriority" class="category-select">
+          <option value="low">עדיפות נמוכה</option>
+          <option value="medium" selected>עדיפות בינונית</option>
+          <option value="high">עדיפות גבוהה</option>
+        </select>
+        <select id="taskCategory" class="category-select">
+          <option value="general">כללי</option>
+          <option value="work">עבודה</option>
+          <option value="personal">אישי</option>
+          <option value="health">בריאות</option>
+          <option value="education">לימודים</option>
+        </select>
         <button class="btn" onclick="addNewTask()">הוסף</button>
       </div>
       
@@ -218,6 +401,7 @@
         <button id="filterAll" class="active" onclick="filterTasks('all')">הכל</button>
         <button id="filterActive" onclick="filterTasks('active')">פעילות</button>
         <button id="filterCompleted" onclick="filterTasks('completed')">הושלמו</button>
+        <button id="filterCategory" onclick="openCategoryFilterModal()">סנן לפי קטגוריה</button>
       </div>
       
       <!-- רשימת משימות -->
@@ -228,6 +412,7 @@
       <!-- כפתורי ניהול משימות -->
       <div style="display: flex; justify-content: space-between; margin-top: 20px;">
         <button class="btn" onclick="saveTasksToFile()">יצוא משימות</button>
+        <button class="btn" onclick="openRecurringTasksModal()">פעילויות חוזרות</button>
         <button class="btn btn-danger" onclick="clearCompletedTasks()">מחק משימות שהושלמו</button>
       </div>
       
@@ -246,12 +431,101 @@
           <div>בתהליך</div>
         </div>
       </div>
+      
+      <!-- מדור הגרפים -->
+      <div class="charts-section">
+        <h2>ניתוח נתונים והתקדמות</h2>
+        
+        <div class="chart-tabs">
+          <div class="chart-tab active" onclick="showChart('progress')">התקדמות שבועית</div>
+          <div class="chart-tab" onclick="showChart('categories')">התפלגות קטגוריות</div>
+          <div class="chart-tab" onclick="showChart('priorities')">עדיפויות</div>
+        </div>
+        
+        <div class="chart-container">
+          <canvas id="progressChart"></canvas>
+          <canvas id="categoriesChart" style="display: none;"></canvas>
+          <canvas id="prioritiesChart" style="display: none;"></canvas>
+        </div>
+      </div>
+      
+      <!-- הצעות לפעילויות חוזרות -->
+      <div class="recurring-tasks">
+        <h3>הצעות לפעילויות חוזרות</h3>
+        <div id="recurringTasksList">
+          <!-- הצעות לפעילויות חוזרות יתווספו כאן דינמית -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- מודל פעילויות חוזרות -->
+    <div id="recurringTasksModal" class="modal-overlay">
+      <div class="modal-container">
+        <div class="modal-header">
+          <h3>הגדרת פעילות חוזרת</h3>
+          <button class="modal-close" onclick="closeModal('recurringTasksModal')">&times;</button>
+        </div>
+        <div>
+          <input type="text" id="recurringTaskName" placeholder="שם המשימה" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+          <select id="recurringFrequency" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+            <option value="daily">יומי</option>
+            <option value="weekly">שבועי</option>
+            <option value="monthly">חודשי</option>
+          </select>
+          <select id="recurringCategory" style="width: 100%; padding: 8px; margin-bottom: 15px;">
+            <option value="general">כללי</option>
+            <option value="work">עבודה</option>
+            <option value="personal">אישי</option>
+            <option value="health">בריאות</option>
+            <option value="education">לימודים</option>
+          </select>
+          <button class="btn" style="width: 100%;" onclick="addRecurringTask()">הוסף פעילות חוזרת</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- מודל סינון לפי קטגוריה -->
+    <div id="categoryFilterModal" class="modal-overlay">
+      <div class="modal-container">
+        <div class="modal-header">
+          <h3>סינון לפי קטגוריה</h3>
+          <button class="modal-close" onclick="closeModal('categoryFilterModal')">&times;</button>
+        </div>
+        <div id="categoryFilterOptions">
+          <div style="margin-bottom: 10px;">
+            <input type="checkbox" id="categoryGeneral" checked>
+            <label for="categoryGeneral">כללי</label>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <input type="checkbox" id="categoryWork" checked>
+            <label for="categoryWork">עבודה</label>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <input type="checkbox" id="categoryPersonal" checked>
+            <label for="categoryPersonal">אישי</label>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <input type="checkbox" id="categoryHealth" checked>
+            <label for="categoryHealth">בריאות</label>
+          </div>
+          <div style="margin-bottom: 15px;">
+            <input type="checkbox" id="categoryEducation" checked>
+            <label for="categoryEducation">לימודים</label>
+          </div>
+          <button class="btn" style="width: 100%;" onclick="applyCategoryFilter()">החל סינון</button>
+        </div>
+      </div>
     </div>
 
     <script>
       // מערך המשימות
       let tasks = [];
       let currentFilter = 'all';
+      let selectedCategories = ['general', 'work', 'personal', 'health', 'education'];
+      let currentMood = null;
+      let recurringTasks = [];
+      let charts = {};
+      let activeChart = 'progress';
       
       // טעינת משימות בטעינת הדף
       document.addEventListener('DOMContentLoaded', () => {
@@ -262,8 +536,11 @@
         //   updateTaskStats();
         // }).loadTasksFromSheet();
         
+        initializeCharts();
+        populateRecurringTaskSuggestions();
         renderTasks();
         updateTaskStats();
+        updateCharts();
       });
       
       // עדכון סטטיסטיקות המשימות
@@ -272,6 +549,7 @@
         // בעתיד ניתן להוסיף כאן שמירה לשרת
         // google.script.run.saveTasksToSheet(tasks);
         updateTaskStats();
+        updateCharts();
       }
       
       // הפונקציה הזאת קיימת לצורך תמיכה בהרחבה עתידית
@@ -280,10 +558,228 @@
         renderTasks();
       }
       
+      // אתחול הגרפים
+      function initializeCharts() {
+        // גרף התקדמות שבועית
+        const progressCtx = document.getElementById('progressChart').getContext('2d');
+        charts.progress = new Chart(progressCtx, {
+          type: 'line',
+          data: {
+            labels: getLastSevenDays(),
+            datasets: [
+              {
+                label: 'משימות שהושלמו',
+                data: [0, 0, 0, 0, 0, 0, 0],
+                borderColor: '#4caf50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                tension: 0.4,
+                fill: true
+              },
+              {
+                label: 'משימות חדשות',
+                data: [0, 0, 0, 0, 0, 0, 0],
+                borderColor: '#2196f3',
+                backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                tension: 0.4,
+                fill: true
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'top' },
+              title: { display: true, text: 'התקדמות שבועית' }
+            }
+          }
+        });
+        
+        // גרף התפלגות קטגוריות
+        const categoriesCtx = document.getElementById('categoriesChart').getContext('2d');
+        charts.categories = new Chart(categoriesCtx, {
+          type: 'pie',
+          data: {
+            labels: ['כללי', 'עבודה', 'אישי', 'בריאות', 'לימודים'],
+            datasets: [{
+              data: [0, 0, 0, 0, 0],
+              backgroundColor: [
+                '#9e9e9e', '#f44336', '#2196f3', '#4caf50', '#ff9800'
+              ]
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'right' },
+              title: { display: true, text: 'התפלגות לפי קטגוריות' }
+            }
+          }
+        });
+        
+        // גרף התפלגות עדיפויות
+        const prioritiesCtx = document.getElementById('prioritiesChart').getContext('2d');
+        charts.priorities = new Chart(prioritiesCtx, {
+          type: 'bar',
+          data: {
+            labels: ['נמוכה', 'בינונית', 'גבוהה'],
+            datasets: [{
+              label: 'כמות משימות',
+              data: [0, 0, 0],
+              backgroundColor: [
+                '#81c784', '#ffb74d', '#e57373'
+              ]
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              title: { display: true, text: 'התפלגות לפי עדיפויות' }
+            }
+          }
+        });
+      }
+      
+      // עדכון הגרפים
+      function updateCharts() {
+        // עדכון גרף התקדמות
+        const weekData = getWeekActivityData();
+        charts.progress.data.datasets[0].data = weekData.completed;
+        charts.progress.data.datasets[1].data = weekData.added;
+        charts.progress.update();
+        
+        // עדכון גרף קטגוריות
+        const categoryData = getCategoryData();
+        charts.categories.data.datasets[0].data = [
+          categoryData.general,
+          categoryData.work,
+          categoryData.personal,
+          categoryData.health,
+          categoryData.education
+        ];
+        charts.categories.update();
+        
+        // עדכון גרף עדיפויות
+        const priorityData = getPriorityData();
+        charts.priorities.data.datasets[0].data = [
+          priorityData.low,
+          priorityData.medium,
+          priorityData.high
+        ];
+        charts.priorities.update();
+      }
+      
+      // פונקציה להחלפה בין גרפים
+      function showChart(chartName) {
+        // עדכון הכפתורים
+        document.querySelectorAll('.chart-tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelector(`.chart-tab:nth-child(${chartName === 'progress' ? 1 : chartName === 'categories' ? 2 : 3})`).classList.add('active');
+        
+        // החלפת הגרף המוצג
+        document.getElementById('progressChart').style.display = 'none';
+        document.getElementById('categoriesChart').style.display = 'none';
+        document.getElementById('prioritiesChart').style.display = 'none';
+        document.getElementById(`${chartName}Chart`).style.display = 'block';
+        
+        activeChart = chartName;
+      }
+      
+      // קבלת נתוני פעילות שבועית
+      function getWeekActivityData() {
+        const dates = getLastSevenDays(true);
+        const completed = Array(7).fill(0);
+        const added = Array(7).fill(0);
+        
+        tasks.forEach(task => {
+          const taskDate = new Date(task.createdAt).toISOString().split('T')[0];
+          const completedDate = task.completed && task.completedAt ? new Date(task.completedAt).toISOString().split('T')[0] : null;
+          
+          // בדיקה אם המשימה נוצרה בשבוע האחרון
+          const addedIndex = dates.indexOf(taskDate);
+          if (addedIndex !== -1) {
+            added[addedIndex]++;
+          }
+          
+          // בדיקה אם המשימה הושלמה בשבוע האחרון
+          if (completedDate) {
+            const completedIndex = dates.indexOf(completedDate);
+            if (completedIndex !== -1) {
+              completed[completedIndex]++;
+            }
+          }
+        });
+        
+        return { completed, added };
+      }
+      
+      // קבלת נתוני התפלגות קטגוריות
+      function getCategoryData() {
+        const categoryData = {
+          general: 0,
+          work: 0,
+          personal: 0,
+          health: 0,
+          education: 0
+        };
+        
+        tasks.forEach(task => {
+          if (task.category && categoryData.hasOwnProperty(task.category)) {
+            categoryData[task.category]++;
+          } else {
+            categoryData.general++;
+          }
+        });
+        
+        return categoryData;
+      }
+      
+      // קבלת נתוני התפלגות עדיפויות
+      function getPriorityData() {
+        const priorityData = {
+          low: 0,
+          medium: 0,
+          high: 0
+        };
+        
+        tasks.forEach(task => {
+          if (task.priority && priorityData.hasOwnProperty(task.priority)) {
+            priorityData[task.priority]++;
+          } else {
+            priorityData.medium++;
+          }
+        });
+        
+        return priorityData;
+      }
+      
+      // פונקציה להחזרת 7 הימים האחרונים בפורמט מתאים
+      function getLastSevenDays(asISOString = false) {
+        const days = [];
+        const today = new Date();
+        
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(today.getDate() - i);
+          
+          if (asISOString) {
+            days.push(date.toISOString().split('T')[0]);
+          } else {
+            days.push(date.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' }));
+          }
+        }
+        
+        return days;
+      }
+      
       // הוספת משימה חדשה
       function addNewTask() {
         const taskInput = document.getElementById('newTaskInput');
         const dateInput = document.getElementById('newTaskDate');
+        const prioritySelect = document.getElementById('taskPriority');
+        const categorySelect = document.getElementById('taskCategory');
         
         if (taskInput.value.trim() === '') {
           showMessage('נא להזין תוכן למשימה', 'error');
@@ -295,7 +791,10 @@
           text: taskInput.value.trim(),
           completed: false,
           date: dateInput.value || null,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          priority: prioritySelect.value,
+          category: categorySelect.value,
+          mood: currentMood
         };
         
         tasks.push(newTask);
@@ -305,6 +804,7 @@
         // נקה את השדות
         taskInput.value = '';
         dateInput.value = '';
+        prioritySelect.value = 'medium';
         
         showMessage(`המשימה "${newTask.text}" נוספה בהצלחה!`, 'success');
       }
@@ -314,11 +814,15 @@
         const taskList = document.getElementById('taskList');
         taskList.innerHTML = '';
         
-        // סינון המשימות לפי הפילטר הנוכחי
+        // סינון המשימות לפי הפילטר הנוכחי והקטגוריות
         const filteredTasks = tasks.filter(task => {
-          if (currentFilter === 'all') return true;
-          if (currentFilter === 'active') return !task.completed;
-          if (currentFilter === 'completed') return task.completed;
+          const statusFilter = currentFilter === 'all' ||
+                              (currentFilter === 'active' && !task.completed) ||
+                              (currentFilter === 'completed' && task.completed);
+          
+          const categoryFilter = !task.category || selectedCategories.includes(task.category);
+          
+          return statusFilter && categoryFilter;
         });
         
         if (filteredTasks.length === 0) {
@@ -337,11 +841,32 @@
             dateText = `<span class="task-date">${taskDate.toLocaleDateString('he-IL')}</span>`;
           }
           
+          // הוספת תגיות
+          let tagsHtml = '<div class="task-tags">';
+          
+          // תג עדיפות
+          if (task.priority) {
+            tagsHtml += `<span class="task-tag ${task.priority}">${getPriorityText(task.priority)}</span>`;
+          }
+          
+          // תג קטגוריה
+          if (task.category) {
+            tagsHtml += `<span class="task-tag">${getCategoryText(task.category)}</span>`;
+          }
+          
+          // תג מצב רוח (אם קיים)
+          if (task.mood) {
+            tagsHtml += `<span class="task-tag">${task.mood}</span>`;
+          }
+          
+          tagsHtml += '</div>';
+          
           listItem.innerHTML = `
             <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})">
             <div class="task-content">
               <span>${task.text}</span>
               ${dateText}
+              ${tagsHtml}
             </div>
             <div class="task-actions">
               <button onclick="editTask(${task.id})" title="ערוך">✏️</button>
@@ -353,11 +878,41 @@
         });
       }
       
+      // פונקציה להמרת ערך עדיפות לטקסט
+      function getPriorityText(priority) {
+        switch (priority) {
+          case 'low': return 'נמוכה';
+          case 'medium': return 'בינונית';
+          case 'high': return 'גבוהה';
+          default: return 'בינונית';
+        }
+      }
+      
+      // פונקציה להמרת ערך קטגוריה לטקסט
+      function getCategoryText(category) {
+        switch (category) {
+          case 'general': return 'כללי';
+          case 'work': return 'עבודה';
+          case 'personal': return 'אישי';
+          case 'health': return 'בריאות';
+          case 'education': return 'לימודים';
+          default: return 'כללי';
+        }
+      }
+      
       // סימון משימה כהושלמה/לא הושלמה
       function toggleTask(id) {
         const taskIndex = tasks.findIndex(task => task.id === id);
         if (taskIndex !== -1) {
           tasks[taskIndex].completed = !tasks[taskIndex].completed;
+          
+          // הוספת תאריך השלמה אם המשימה סומנה כהושלמה
+          if (tasks[taskIndex].completed) {
+            tasks[taskIndex].completedAt = new Date().toISOString();
+          } else {
+            tasks[taskIndex].completedAt = null;
+          }
+          
           saveTasks();
           renderTasks();
           
@@ -402,6 +957,33 @@
         document.getElementById(`filter${filter.charAt(0).toUpperCase() + filter.slice(1)}`).classList.add('active');
         
         renderTasks();
+      }
+      
+      // פתיחת מודל סינון לפי קטגוריה
+      function openCategoryFilterModal() {
+        document.getElementById('categoryFilterModal').style.display = 'block';
+        
+        // עדכון מצב הצ'קבוקסים לפי הקטגוריות הנבחרות
+        selectedCategories.forEach(category => {
+          document.getElementById(`category${category.charAt(0).toUpperCase() + category.slice(1)}`).checked = true;
+        });
+      }
+      
+      // החלת סינון לפי קטגוריה
+      function applyCategoryFilter() {
+        selectedCategories = [];
+        
+        // קריאת ערכי הצ'קבוקסים
+        if (document.getElementById('categoryGeneral').checked) selectedCategories.push('general');
+        if (document.getElementById('categoryWork').checked) selectedCategories.push('work');
+        if (document.getElementById('categoryPersonal').checked) selectedCategories.push('personal');
+        if (document.getElementById('categoryHealth').checked) selectedCategories.push('health');
+        if (document.getElementById('categoryEducation').checked) selectedCategories.push('education');
+        
+        closeModal('categoryFilterModal');
+        renderTasks();
+        
+        showMessage('הסינון הוחל בהצלחה', 'success');
       }
       
       // מחיקת כל המשימות שהושלמו
@@ -460,6 +1042,117 @@
         setTimeout(() => {
           messageBox.style.display = 'none';
         }, 3000);
+      }
+      
+      // הגדרת מצב רוח נוכחי
+      function setMood(mood) {
+        currentMood = mood;
+        
+        // עדכון חזותי
+        document.querySelectorAll('.mood-icon').forEach(icon => {
+          icon.classList.remove('selected');
+        });
+        
+        // מציאת האייקון שנלחץ והוספת מחלקת 'selected'
+        Array.from(document.querySelectorAll('.mood-icon')).find(el => el.textContent === mood)?.classList.add('selected');
+        
+        showMessage(`מצב הרוח עודכן ל: ${mood}`, 'success');
+      }
+      
+      // יצירת הצעות לפעילויות חוזרות
+      function populateRecurringTaskSuggestions() {
+        const recurringTasksList = document.getElementById('recurringTasksList');
+        const suggestions = [
+          { icon: '🏃', text: 'אימון יומי', frequency: 'daily', category: 'health' },
+          { icon: '📚', text: 'קריאת ספר', frequency: 'daily', category: 'personal' },
+          { icon: '🧹', text: 'ניקיון הבית', frequency: 'weekly', category: 'personal' },
+          { icon: '💻', text: 'גיבוי מסמכים', frequency: 'weekly', category: 'work' },
+          { icon: '🛒', text: 'קניות שבועיות', frequency: 'weekly', category: 'personal' },
+          { icon: '📊', text: 'סיכום חודשי', frequency: 'monthly', category: 'work' }
+        ];
+        
+        recurringTasksList.innerHTML = '';
+        suggestions.forEach(suggestion => {
+          const suggestionItem = document.createElement('div');
+          suggestionItem.className = 'recurring-suggestion';
+          suggestionItem.innerHTML = `
+            <div class="recurring-icon">${suggestion.icon}</div>
+            <span>${suggestion.text} (${getFrequencyText(suggestion.frequency)})</span>
+            <button class="btn" onclick="addSuggestedRecurringTask('${suggestion.text}', '${suggestion.frequency}', '${suggestion.category}')">הוסף</button>
+          `;
+          recurringTasksList.appendChild(suggestionItem);
+        });
+      }
+      
+      // המרת תדירות לטקסט בעברית
+      function getFrequencyText(frequency) {
+        switch (frequency) {
+          case 'daily': return 'יומי';
+          case 'weekly': return 'שבועי';
+          case 'monthly': return 'חודשי';
+          default: return '';
+        }
+      }
+      
+      // הוספת משימה חוזרת מההצעות
+      function addSuggestedRecurringTask(text, frequency, category) {
+        document.getElementById('recurringTaskName').value = text;
+        document.getElementById('recurringFrequency').value = frequency;
+        document.getElementById('recurringCategory').value = category;
+        openRecurringTasksModal();
+      }
+      
+      // פתיחת מודל פעילויות חוזרות
+      function openRecurringTasksModal() {
+        document.getElementById('recurringTasksModal').style.display = 'block';
+      }
+      
+      // הוספת פעילות חוזרת
+      function addRecurringTask() {
+        const taskName = document.getElementById('recurringTaskName').value.trim();
+        const frequency = document.getElementById('recurringFrequency').value;
+        const category = document.getElementById('recurringCategory').value;
+        
+        if (!taskName) {
+          showMessage('נא להזין שם למשימה', 'error');
+          return;
+        }
+        
+        // יצירת משימה חוזרת
+        const recurringTask = {
+          id: Date.now(),
+          text: taskName,
+          frequency: frequency,
+          category: category,
+          lastCreated: null
+        };
+        
+        recurringTasks.push(recurringTask);
+        
+        // יצירת המשימה הראשונה מהפעילות החוזרת
+        const newTask = {
+          id: Date.now() + 1,
+          text: `${taskName} (${getFrequencyText(frequency)})`,
+          completed: false,
+          date: null,
+          createdAt: new Date().toISOString(),
+          priority: 'medium',
+          category: category,
+          isRecurring: true,
+          recurringId: recurringTask.id
+        };
+        
+        tasks.push(newTask);
+        saveTasks();
+        renderTasks();
+        
+        closeModal('recurringTasksModal');
+        showMessage(`הפעילות החוזרת "${taskName}" נוספה בהצלחה`, 'success');
+      }
+      
+      // סגירת מודל
+      function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
       }
     </script>
   </body>
